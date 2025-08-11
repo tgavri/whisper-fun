@@ -3,6 +3,7 @@
     nativeBuildInputs = with pkgs.buildPackages; [ 
       python313
       python313Packages.openai-whisper
+      python313Packages.streamlit
       ffmpeg
     ];
 }
