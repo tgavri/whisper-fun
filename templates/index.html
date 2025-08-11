@@ -14,17 +14,28 @@
 
   <h1 class="text-3xl font-bold mb-6 text-center">🎙️ Whisper Audio Transcription</h1>
 
+  <!-- Drop/Upload zone -->
   <div id="dropZone" class="w-full max-w-xl border-2 border-dashed border-gray-500 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-400 transition">
     <p class="text-gray-300">Drag & drop your audio file here or click to browse</p>
     <input id="fileInput" type="file" name="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.webm" class="hidden"/>
   </div>
 
+  <!-- Audio preview -->
   <div id="audioPreviewContainer" class="mt-4 hidden w-full max-w-xl">
     <audio id="audioPreview" controls class="w-full"></audio>
   </div>
 
+  <!-- Recording button (toggles dynamically) -->
+  <div class="mt-4">
+  <button id="recordBtn" class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded shadow">
+    Start Recording
+  </button>  
+  </div>
+
+  <!-- Upload/transcribe button -->
   <button id="uploadBtn" class="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded shadow disabled:opacity-50" disabled>Transcribe</button>
 
+  <!-- Loading spinner -->
   <div id="loading" class="hidden mt-6">
     <svg class="animate-spin h-8 w-8 text-indigo-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -33,6 +44,7 @@
     <p class="mt-2 text-sm text-gray-400">Transcribing… please wait</p>
   </div>
 
+  <!-- Result -->
   <div id="resultCard" class="hidden mt-8 w-full max-w-3xl bg-gray-800 rounded-lg shadow p-6">
     <h2 class="text-xl font-semibold mb-2">Transcript</h2>
     <p id="transcriptText" class="mb-4 whitespace-pre-wrap text-gray-200"></p>
@@ -50,10 +62,15 @@ const loading = document.getElementById('loading');
 const resultCard = document.getElementById('resultCard');
 const transcriptText = document.getElementById('transcriptText');
 const jsonOutput = document.getElementById('jsonOutput');
-const audioPreviewContainer = document.getElementById('audioPreviewContainer'); // NEW
+const audioPreviewContainer = document.getElementById('audioPreviewContainer');
 const audioPreview = document.getElementById('audioPreview');
 
+const startRecordingBtn = document.getElementById('startRecording');
+const stopRecordingBtn = document.getElementById('stopRecording');
+
 let selectedFile = null;
+let mediaRecorder;
+let audioChunks = [];
 
 function showFile(file) {
   selectedFile = file;
@@ -64,12 +81,11 @@ function showFile(file) {
   audioPreviewContainer.classList.remove("hidden");
 }
 
+// ==== Upload / drag & drop handling ====
 dropZone.addEventListener('click', () => fileInput.click());
-
 fileInput.addEventListener('change', () => {
   if(fileInput.files.length) showFile(fileInput.files[0]);
 });
-
 dropZone.addEventListener('dragover', e => {
   e.preventDefault();
   dropZone.classList.add('border-indigo-400');
@@ -83,6 +99,44 @@ dropZone.addEventListener('drop', e => {
   if(e.dataTransfer.files.length) showFile(e.dataTransfer.files[0]);
 });
 
+// ==== Recording handling ====
+const recordBtn = document.getElementById('recordBtn');
+let isRecording = false;
+
+recordBtn.onclick = async () => {
+  if (!isRecording) {
+    // Start recording
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+      mediaRecorder.start();
+      isRecording = true;
+      recordBtn.textContent = "Stop Recording";
+      recordBtn.classList.remove('bg-green-600','hover:bg-green-500');
+      recordBtn.classList.add('bg-red-600','hover:bg-red-500');
+      dropZone.querySelector('p').textContent = "Recording... Speak now.";
+    } catch (err) {
+      alert("Microphone access denied or unavailable.");
+    }
+  } else {
+    // Stop recording
+    mediaRecorder.stop();
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      showFile(new File([audioBlob], "recording.webm", { type: "audio/webm" }));
+    };
+    isRecording = false;
+    recordBtn.textContent = "Start Recording";
+    recordBtn.classList.remove('bg-red-600','hover:bg-red-500');
+    recordBtn.classList.add('bg-green-600','hover:bg-green-500');
+  }
+};
+
+// ==== Transcribe submission ====
 uploadBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
   const formData = new FormData();
