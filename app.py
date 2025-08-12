@@ -19,15 +19,20 @@ def transcribe():
     if "file" not in request.files:
         abort(400, description="No file uploaded")
     audio_file = request.files["file"]
+    language = request.form.get("language") or None  # "" means auto
     with NamedTemporaryFile(delete=True, suffix=os.path.splitext(audio_file.filename)[1]) as tmp:
         audio_file.save(tmp.name)
-        result = model.transcribe(tmp.name)
+        # Pass language if set, otherwise let Whisper auto-detect
+        transcribe_kwargs = {}
+        if language:
+            transcribe_kwargs['language'] = language
+        result = model.transcribe(tmp.name, **transcribe_kwargs)
     return jsonify({
         "transcript": result["text"],
         "language": result.get("language", ""),
         "segments": result.get("segments", [])
     })
-    
+
 #production:
 #if __name__ == "__main__":
     #app.run(host="0.0.0.0", port=5000, debug=True)

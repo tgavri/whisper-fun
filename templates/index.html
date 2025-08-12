@@ -12,7 +12,24 @@
 
 <div class="min-h-screen flex flex-col items-center justify-center p-6">
 
-  <h1 class="text-3xl font-bold mb-6 text-center">🎙️ Whisper Audio Transcription</h1>
+  <h1 class="text-3xl font-bold mb-6 text-center">Audio Transskribering med Whisper</h1>
+  <h1 class="text-2xl font-bold mb-6 text-center">Omdan lyd til tekst</h1>
+  <h1 class="text-1xl font-bold mb-6 text-center">It's real magic!</h1>
+
+<!-- Language selection -->
+<div class="mt-4 w-full max-w-xl">
+  <label for="languageSelect" class="text-gray-200 mb-1 block">Language</label>
+  <select id="languageSelect" class="w-full px-3 py-2 rounded-md bg-gray-800 text-gray-100 border border-gray-600">
+    <option value="">Auto - detect language</option>
+    <option value="da">Danish</option>
+    <option value="en">English</option>
+    <option value="sv">Swedish</option>
+    <option value="de">German</option>
+    <option value="fr">French</option>
+    <option value="es">Spanish</option>
+    <!-- Add more as needed, using ISO 639-1 codes -->
+  </select>
+</div>
 
   <!-- Drop/Upload zone -->
   <div id="dropZone" class="w-full max-w-xl border-2 border-dashed border-gray-500 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-400 transition">
@@ -137,10 +154,14 @@ recordBtn.onclick = async () => {
 };
 
 // ==== Transcribe submission ====
+const languageSelect = document.getElementById('languageSelect');
+
 uploadBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
   const formData = new FormData();
   formData.append("file", selectedFile);
+  // add language
+  formData.append("language", languageSelect.value);
 
   loading.classList.remove('hidden');
   resultCard.classList.add('hidden');
@@ -163,6 +184,7 @@ uploadBtn.addEventListener('click', async () => {
     uploadBtn.disabled = false;
   }
 });
+
 </script>
 
 </body>
