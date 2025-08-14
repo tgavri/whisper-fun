@@ -40,18 +40,37 @@ def transcribe():
         abort(400, description="No file uploaded")
     audio_file = request.files["file"]
     language = request.form.get("language") or None  # "" means auto
-    with NamedTemporaryFile(delete=True, suffix=os.path.splitext(audio_file.filename)[1]) as tmp:
-        audio_file.save(tmp.name)
-        # Pass language if set, otherwise let Whisper auto-detect
+
+    # Save input to temp file
+    with NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.filename)[1]) as tmp_input:
+        audio_file.save(tmp_input.name)
+        tmp_input_path = tmp_input.name
+
+    # Convert to WAV
+    with NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
+        tmp_wav_path = tmp_wav.name
+
+    try:
+        ffmpeg.input(tmp_input_path).output(tmp_wav_path, format="wav", ar="16k").run(quiet=True, overwrite_output=True)
+
+        # Transcribe
         transcribe_kwargs = {}
         if language:
             transcribe_kwargs['language'] = language
-        result = model.transcribe(tmp.name, **transcribe_kwargs)
-    return jsonify({
-        "transcript": result["text"],
-        "language": result.get("language", ""),
-        "segments": result.get("segments", [])
-    })
+        result = model.transcribe(tmp_wav_path, **transcribe_kwargs)
+
+        return jsonify({
+            "transcript": result["text"],
+            "language": result.get("language", ""),
+            "segments": result.get("segments", [])
+        })
+
+    finally:
+        # Clean up
+        if os.path.exists(tmp_input_path):
+            os.remove(tmp_input_path)
+        if os.path.exists(tmp_wav_path):
+            os.remove(tmp_wav_path)
 
 @app.route("/transcribe/srt", methods=["POST"])
 def transcribe_srt():

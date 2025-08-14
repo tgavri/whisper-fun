@@ -27,6 +27,7 @@
     <option value="de">German</option>
     <option value="fr">French</option>
     <option value="es">Spanish</option>
+    <option value="ko">Korean</option>
     <!-- Add more as needed, using ISO 639-1 codes -->
   </select>
 </div>
@@ -96,7 +97,11 @@ function showFile(file) {
   selectedFile = file;
   uploadBtn.disabled = false;
   uploadSrtBtn.disabled = false; 
+
+  const lang = languageSelect.value || langCode;
+  const fileSelectedFn = translations[lang]?.fileSelected || translations.en.fileSelected;
   dropZone.querySelector('p').textContent = `Selected: ${selectedFile.name}`;
+
   const objectURL = URL.createObjectURL(selectedFile);
   audioPreview.src = objectURL;
   audioPreviewContainer.classList.remove("hidden");
@@ -164,7 +169,6 @@ uploadBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
   const formData = new FormData();
   formData.append("file", selectedFile);
-  // add language
   formData.append("language", languageSelect.value);
 
   loading.classList.remove('hidden');
@@ -173,18 +177,21 @@ uploadBtn.addEventListener('click', async () => {
 
   try {
     const res = await fetch('/transcribe', { method: 'POST', body: formData });
-    const data = await res.json();
-
-    transcriptText.textContent = data.transcript || "[no transcription]";
-    jsonOutput.textContent = JSON.stringify(data, null, 2);
-    hljs.highlightElement(jsonOutput);
-
-    loading.classList.add('hidden');
-    resultCard.classList.remove('hidden');
+    const resText = await res.text();
+    try {
+      const data = JSON.parse(resText);
+      transcriptText.textContent = data.transcript || "[no transcription]";
+      jsonOutput.textContent = JSON.stringify(data, null, 2);
+      hljs.highlightElement(jsonOutput);
+      loading.classList.add('hidden');
+      resultCard.classList.remove('hidden');
+    } catch(e) {
+      alert("Server response is not valid JSON:\n" + resText);
+    }
   } catch (err) {
     alert("Error: " + err);
-    loading.classList.add('hidden');
   } finally {
+    loading.classList.add('hidden');
     uploadBtn.disabled = false;
   }
 });
@@ -216,6 +223,156 @@ uploadSrtBtn.addEventListener('click', async () => {
     uploadSrtBtn.disabled = false;
   }
 });
+
+const translations = {
+  en: {
+    title: "Audio Transcription with Whisper",
+    subtitle: "Turn audio into text",
+    magic: "It's real magic!",
+    dragDrop: "Drag & drop your audio file here or click to browse",
+    languageLabel: "Language",
+    recordStart: "Start Recording",
+    recordStop: "Stop Recording",
+    transcribe: "Transcribe",
+    exportSrt: "Export SRT",
+    loading: "Transcribing… please wait",
+    transcript: "Transcript",
+    json: "Full JSON Response",
+    recording: "Recording... Speak now.",
+    fileSelected: name => `Selected: ${name}`
+  },
+  da: {
+    title: "Audio Transskribering med Whisper",
+    subtitle: "Omdan lyd til tekst",
+    magic: "Det er ægte magi!",
+    dragDrop: "Træk og slip din lydfil her eller klik for at vælge",
+    languageLabel: "Sprog",
+    recordStart: "Start optagelse",
+    recordStop: "Stop optagelse",
+    transcribe: "Transskriber",
+    exportSrt: "Eksporter SRT",
+    loading: "Transskriberer... vent venligst",
+    transcript: "Udskrift",
+    json: "Fuldt JSON-svar",
+    recording: "Optager... Tal nu.",
+    fileSelected: name => `Valgt: ${name}`
+  },
+  sv: {
+    title: "Ljudtranskribering med Whisper",
+    subtitle: "Omvandla ljud till text",
+    magic: "Det är riktig magi!",
+    dragDrop: "Dra och släpp din ljudfil här eller klicka för att bläddra",
+    languageLabel: "Språk",
+    recordStart: "Starta inspelning",
+    recordStop: "Stoppa inspelning",
+    transcribe: "Transkribera",
+    exportSrt: "Exportera SRT",
+    loading: "Transkriberar... vänligen vänta",
+    transcript: "Transkription",
+    json: "Full JSON-respons",
+    recording: "Spelar in... Prata nu.",
+    fileSelected: name => `Vald: ${name}`
+  },
+  de: {
+    title: "Audio-Transkription mit Whisper",
+    subtitle: "Audio in Text umwandeln",
+    magic: "Es ist echte Magie!",
+    dragDrop: "Datei hierher ziehen oder klicken zum Hochladen",
+    languageLabel: "Sprache",
+    recordStart: "Aufnahme starten",
+    recordStop: "Aufnahme stoppen",
+    transcribe: "Transkribieren",
+    exportSrt: "SRT exportieren",
+    loading: "Transkribieren... bitte warten",
+    transcript: "Transkript",
+    json: "Vollständige JSON-Antwort",
+    recording: "Nehme auf... Sprich jetzt.",
+    fileSelected: name => `Ausgewählt: ${name}`
+  },
+  fr: {
+    title: "Transcription audio avec Whisper",
+    subtitle: "Transformer l’audio en texte",
+    magic: "C’est de la vraie magie !",
+    dragDrop: "Glissez-déposez votre fichier audio ou cliquez pour parcourir",
+    languageLabel: "Langue",
+    recordStart: "Démarrer l’enregistrement",
+    recordStop: "Arrêter l’enregistrement",
+    transcribe: "Transcrire",
+    exportSrt: "Exporter en SRT",
+    loading: "Transcription en cours… veuillez patienter",
+    transcript: "Transcription",
+    json: "Réponse JSON complète",
+    recording: "Enregistrement... Parlez maintenant.",
+    fileSelected: name => `Sélectionné : ${name}`
+  },
+  es: {
+    title: "Transcripción de audio con Whisper",
+    subtitle: "Convierte audio en texto",
+    magic: "¡Es magia de verdad!",
+    dragDrop: "Arrastra y suelta tu archivo de audio aquí o haz clic para buscar",
+    languageLabel: "Idioma",
+    recordStart: "Iniciar grabación",
+    recordStop: "Detener grabación",
+    transcribe: "Transcribir",
+    exportSrt: "Exportar SRT",
+    loading: "Transcribiendo... por favor espera",
+    transcript: "Transcripción",
+    json: "Respuesta JSON completa",
+    recording: "Grabando... Habla ahora.",
+    fileSelected: name => `Seleccionado: ${name}`
+  },
+  ko: {
+  title: "Whisper로 오디오 전사",
+  subtitle: "오디오를 텍스트로 변환",
+  magic: "진짜 마법 같아요!",
+  dragDrop: "오디오 파일을 여기로 드래그하거나 클릭해서 선택하세요",
+  languageLabel: "언어",
+  recordStart: "녹음 시작",
+  recordStop: "녹음 중지",
+  transcribe: "전사하기",
+  exportSrt: "SRT 내보내기",
+  loading: "전사 중... 잠시만 기다려주세요",
+  transcript: "전사 결과",
+  json: "전체 JSON 응답",
+  recording: "녹음 중... 말씀해주세요.",
+  fileSelected: name => `선택됨: ${name}`
+}
+};
+
+function applyTranslations(lang) {
+  const t = translations[lang] || translations.en;
+
+  document.querySelectorAll("h1")[0].textContent = t.title;
+  document.querySelectorAll("h1")[1].textContent = t.subtitle;
+  document.querySelectorAll("h1")[2].textContent = t.magic;
+
+  document.querySelector('label[for="languageSelect"]').textContent = t.languageLabel;
+  document.querySelector('#dropZone p').textContent = t.dragDrop;
+
+  const recordBtn = document.getElementById('recordBtn');
+  recordBtn.textContent = t.recordStart;
+
+  document.getElementById("uploadBtn").textContent = t.transcribe;
+  document.getElementById("uploadSrtBtn").textContent = t.exportSrt;
+
+  document.querySelector("#loading p").textContent = t.loading;
+
+  document.querySelector('#resultCard h2').textContent = t.transcript;
+  document.querySelector('#resultCard h3').textContent = t.json;
+
+  // Hook into record button toggle text
+  recordBtn.dataset.textStart = t.recordStart;
+  recordBtn.dataset.textStop = t.recordStop;
+
+  // Custom message for dropzone update
+  recordBtn.dataset.textRecording = t.recording;
+  dropZone.dataset.fileSelected = t.fileSelected;
+}
+
+// Detect browser language and apply
+const userLang = navigator.language || navigator.userLanguage || "en";
+const langCode = userLang.split('-')[0];
+applyTranslations(langCode);
 
 </script>
 
