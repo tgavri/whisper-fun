@@ -2,16 +2,24 @@ from flask import Flask, request, jsonify, render_template, abort, send_file
 from tempfile import NamedTemporaryFile
 from whisper.utils import get_writer
 import whisper
-import torch
-import os
 import ffmpeg
 import srt
 import datetime
+import os
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['PYTORCH_NVML_BASED_CUDA_CHECK'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+import torch
+print("CUDA Available:", torch.cuda.is_available())
 
 # Select device
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-model = whisper.load_model("large", device=DEVICE)
+model = whisper.load_model("turbo", device=DEVICE)
+
+print("CUDA Available:", torch.cuda.is_available())
+print("Current device:", torch.cuda.current_device())
+print("Device name:", torch.cuda.get_device_name(torch.cuda.current_device()))
 
 # Video to audio
 def is_audio(filename):
@@ -40,18 +48,37 @@ def transcribe():
         abort(400, description="No file uploaded")
     audio_file = request.files["file"]
     language = request.form.get("language") or None  # "" means auto
-    with NamedTemporaryFile(delete=True, suffix=os.path.splitext(audio_file.filename)[1]) as tmp:
-        audio_file.save(tmp.name)
-        # Pass language if set, otherwise let Whisper auto-detect
+
+    # Save input to temp file
+    with NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.filename)[1]) as tmp_input:
+        audio_file.save(tmp_input.name)
+        tmp_input_path = tmp_input.name
+
+    # Convert to WAV
+    with NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
+        tmp_wav_path = tmp_wav.name
+
+    try:
+        ffmpeg.input(tmp_input_path).output(tmp_wav_path, format="wav", ar="16k").run(quiet=True, overwrite_output=True)
+
+        # Transcribe
         transcribe_kwargs = {}
         if language:
             transcribe_kwargs['language'] = language
-        result = model.transcribe(tmp.name, **transcribe_kwargs)
-    return jsonify({
-        "transcript": result["text"],
-        "language": result.get("language", ""),
-        "segments": result.get("segments", [])
-    })
+        result = model.transcribe(tmp_wav_path, **transcribe_kwargs)
+
+        return jsonify({
+            "transcript": result["text"],
+            "language": result.get("language", ""),
+            "segments": result.get("segments", [])
+        })
+
+    finally:
+        # Clean up
+        if os.path.exists(tmp_input_path):
+            os.remove(tmp_input_path)
+        if os.path.exists(tmp_wav_path):
+            os.remove(tmp_wav_path)
 
 @app.route("/transcribe/srt", methods=["POST"])
 def transcribe_srt():
@@ -105,9 +132,9 @@ def transcribe_srt():
             os.remove(tmp_audio_path)
 
 #production:
-#if __name__ == "__main__":
-    #app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
 
 # debug i development
-if __name__ == "__main__":
-    app.run(debug=True)
+#if __name__ == "__main__":
+#    app.run(debug=True)
