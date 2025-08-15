@@ -9,6 +9,7 @@
       # nix repl, :l <nixpkgs>, søg
       python313Packages.ffmpeg-python
       python313Packages.srt
+      python313Packages.argostranslate
     ];
 }
 

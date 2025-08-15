@@ -73,6 +73,22 @@
     <pre><code id="jsonOutput" class="json"></code></pre>
   </div>
 
+  <!-- Record/Translate Section Below Other Content -->
+  <div class="mt-8 w-full max-w-xl bg-gray-700 rounded-lg shadow p-6">
+    <h2 class="text-xl font-semibold mb-2">Live Translate</h2>
+    <button id="translateRecordBtn" class="px-4 py-2 bg-yellow-700 hover:bg-yellow-600 rounded shadow">Record & Translate</button>
+    <audio id="translateAudioPreview" controls class="w-full mt-4 hidden"></audio>
+    <div id="liveTranslationResult" class="mt-4 text-gray-100"></div>
+  </div>
+
+  <!-- Translated Text Section -->
+  <div id="translatedTextContainer" class="hidden mt-8 w-full max-w-3xl bg-gray-800 rounded-lg shadow p-6">
+      <h2 class="text-xl font-semibold mb-2">Translated Text</h2>
+      <p id="translatedText" class="mb-4 whitespace-pre-wrap text-gray-200"></p>
+  </div>
+
+
+
 </div>
 
 <script>
@@ -175,25 +191,19 @@ uploadBtn.addEventListener('click', async () => {
   resultCard.classList.add('hidden');
   uploadBtn.disabled = true;
 
-  try {
-    const res = await fetch('/transcribe', { method: 'POST', body: formData });
-    const resText = await res.text();
-    try {
-      const data = JSON.parse(resText);
-      transcriptText.textContent = data.transcript || "[no transcription]";
-      jsonOutput.textContent = JSON.stringify(data, null, 2);
-      hljs.highlightElement(jsonOutput);
-      loading.classList.add('hidden');
-      resultCard.classList.remove('hidden');
-    } catch(e) {
-      alert("Server response is not valid JSON:\n" + resText);
-    }
-  } catch (err) {
-    alert("Error: " + err);
-  } finally {
-    loading.classList.add('hidden');
-    uploadBtn.disabled = false;
+  const res = await fetch('/translate', { method: 'POST', body: formData });
+  let data;
+  try { data = await res.json(); }
+  catch (e) {
+    liveTranslationResult.innerHTML = "Translation error, no response.";
+    return;
   }
+  if (!res.ok) {
+    liveTranslationResult.innerHTML = `Error: ${data.error || "Unknown error"}`;
+    return;
+  }
+  liveTranslationResult.innerHTML = `<b>Detected:</b> ${data.detected_language}<br><b>Original:</b> ${data.original_text}<br><b>Translation:</b> ${data.translated_text}`;
+
 });
 
 const uploadSrtBtn = document.getElementById('uploadSrtBtn');
@@ -373,6 +383,42 @@ function applyTranslations(lang) {
 const userLang = navigator.language || navigator.userLanguage || "en";
 const langCode = userLang.split('-')[0];
 applyTranslations(langCode);
+
+const translateRecordBtn = document.getElementById('translateRecordBtn');
+const translateAudioPreview = document.getElementById('translateAudioPreview');
+const liveTranslationResult = document.getElementById('liveTranslationResult');
+
+let translationRecorder, translationAudioChunks = [];
+translateRecordBtn.onclick = async () => {
+  if (!translationRecorder || translationRecorder.state === 'inactive') {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    translationRecorder = new MediaRecorder(stream);
+    translationAudioChunks = [];
+    translationRecorder.ondataavailable = e => translationAudioChunks.push(e.data);
+    translationRecorder.onstop = async () => {
+      const blob = new Blob(translationAudioChunks, { type: 'audio/webm' });
+      const file = new File([blob], "translation.webm", { type: "audio/webm" });
+      // Preview
+      translateAudioPreview.src = URL.createObjectURL(blob);
+      translateAudioPreview.classList.remove('hidden');
+      // Upload + translate
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("language", languageSelect.value || "en"); // Use language dropdown choice as target
+      liveTranslationResult.textContent = "Translating...";
+      const res = await fetch('/translate', { method: 'POST', body: formData });
+      const data = await res.json();
+      liveTranslationResult.innerHTML = `<b>Detected:</b> ${data.detected_language}<br><b>Original:</b> ${data.original_text}<br><b>Translation:</b> ${data.translated_text}`;
+    };
+    translationRecorder.start();
+    translateRecordBtn.textContent = "Stop";
+  } else {
+    translationRecorder.stop();
+    translateRecordBtn.textContent = "Record & Translate";
+  }
+};
+
+
 
 </script>
 
